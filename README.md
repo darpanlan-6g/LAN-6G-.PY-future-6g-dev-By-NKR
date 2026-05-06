@@ -1,4 +1,5 @@
 # 🛰️ 6G Network Digital Twin with Deep Reinforcement Learning
+https://darpanlan-6g.github.io/LAN-6G-.PY-future-6g-dev-By-NKR/
 
 > **Research Engineer:** Nitish Kumar Roy  
 > **Domain:** 6G Telecommunications · Network Digital Twins · Deep Reinforcement Learning  
