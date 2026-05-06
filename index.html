@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>6G Network Digital Twin · DRL Framework</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:#020b18;--surface:rgba(6,21,38,0.88);--surface2:rgba(10,31,53,0.92);
+    --cyan:#00f5ff;--green:#39ff8a;--amber:#ffb300;--magenta:#ff2d78;
+    --text:#c8e6ff;--muted:#5a7a9a;--border:rgba(0,245,255,0.15);
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;overflow-x:hidden;cursor:none}
+
+  .cursor{width:12px;height:12px;background:var(--cyan);border-radius:50%;position:fixed;pointer-events:none;z-index:9999;mix-blend-mode:difference}
+  .cursor-ring{width:36px;height:36px;border:1px solid var(--cyan);border-radius:50%;position:fixed;pointer-events:none;z-index:9998;opacity:.5}
+
+  #net-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+  .hero{position:relative;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:4rem 2rem;z-index:1}
+  .badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,245,255,0.07);border:1px solid rgba(0,245,255,0.25);border-radius:100px;padding:6px 18px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--cyan);letter-spacing:.12em;text-transform:uppercase;margin-bottom:2rem;animation:fs .8s ease both}
+  .badge-dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse 2s ease infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.6)}}
+  .hero-title{font-size:clamp(2.4rem,7vw,5.5rem);font-weight:800;line-height:1.05;letter-spacing:-.02em;margin-bottom:1.5rem;animation:fs .9s .1s ease both}
+  .line1{display:block;color:#fff}
+  .line2{display:block;color:var(--cyan)}
+  .line3{display:block;font-size:.55em;color:var(--muted);font-weight:600;letter-spacing:.05em;margin-top:.3em}
+  .hero-desc{max-width:680px;font-size:1.05rem;color:var(--muted);line-height:1.7;margin-bottom:2.5rem;animation:fs 1s .2s ease both}
+  .hero-meta{font-family:'Space Mono',monospace;font-size:.8rem;color:var(--green);letter-spacing:.08em;animation:fs 1s .3s ease both}
+  @keyframes fs{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+  .hero-stats{display:flex;gap:2rem;margin-top:3rem;flex-wrap:wrap;justify-content:center;animation:fs 1s .4s ease both}
+  .stat-pill{background:rgba(6,21,38,0.85);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:12px;padding:1rem 1.5rem;text-align:center;min-width:120px}
+  .stat-val{font-size:1.6rem;font-weight:800;color:var(--cyan);display:block}
+  .stat-label{font-size:.72rem;font-family:'Space Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+
+  section{position:relative;z-index:1;padding:5rem 2rem}
+  .container{max-width:1100px;margin:0 auto}
+  .section-tag{font-family:'Space Mono',monospace;font-size:.72rem;color:var(--cyan);text-transform:uppercase;letter-spacing:.2em;margin-bottom:.8rem;display:flex;align-items:center;gap:10px}
+  .section-tag::before{content:'';display:block;width:30px;height:1px;background:var(--cyan)}
+  h2{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;color:#fff;margin-bottom:1rem;letter-spacing:-.02em}
+  .section-intro{color:var(--muted);font-size:1rem;line-height:1.7;max-width:600px;margin-bottom:3rem}
+
+  .arch-bg{background:rgba(6,21,38,0.4)}
+  .layers-stack{display:flex;flex-direction:column;gap:3px;border:1px solid var(--border);border-radius:16px;overflow:hidden}
+  .layer{display:grid;grid-template-columns:90px 1fr auto;gap:1.5rem;align-items:center;padding:1.2rem 1.8rem;background:var(--surface);backdrop-filter:blur(6px);border-bottom:1px solid rgba(0,245,255,0.06);transition:background .2s,transform .2s;cursor:default;position:relative;overflow:hidden}
+  .layer::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+  .layer:hover{background:var(--surface2);transform:translateX(4px)}
+  .layer-0::before{background:var(--magenta)}.layer-0 .lnum{color:var(--magenta)}
+  .layer-1::before{background:var(--amber)}.layer-1 .lnum{color:var(--amber)}
+  .layer-2a::before{background:#7c4dff}.layer-2a .lnum{color:#7c4dff}
+  .layer-2b::before{background:var(--cyan)}.layer-2b .lnum{color:var(--cyan)}
+  .layer-3::before{background:var(--green)}.layer-3 .lnum{color:var(--green)}
+  .layer-4::before{background:#ff9800}.layer-4 .lnum{color:#ff9800}
+  .layer-5::before{background:#e91e63}.layer-5 .lnum{color:#e91e63}
+  .layer-6::before{background:#00bcd4}.layer-6 .lnum{color:#00bcd4}
+  .lnum{font-family:'Space Mono',monospace;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+  .linfo h3{font-size:1rem;font-weight:700;color:#fff;margin-bottom:.2rem}
+  .linfo p{font-size:.82rem;color:var(--muted);line-height:1.5}
+  .lbadge{font-family:'Space Mono',monospace;font-size:.68rem;padding:3px 10px;border-radius:100px;border:1px solid;white-space:nowrap;opacity:.7}
+
+  .formula-card{background:var(--surface);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:16px;padding:2.5rem;margin:2rem 0;position:relative;overflow:hidden}
+  .formula-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--cyan),var(--green),var(--magenta))}
+  .flabel{font-family:'Space Mono',monospace;font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.15em;margin-bottom:1rem}
+  .formula{font-family:'Space Mono',monospace;font-size:clamp(.8rem,2vw,1.1rem);color:#fff;line-height:1.8}
+  .pos{color:var(--green)}.neg{color:var(--magenta)}.wt{color:var(--amber);font-weight:700}.vr{color:var(--cyan)}
+  .fterms{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-top:1.5rem}
+  .tcard{background:rgba(0,0,0,.3);border-radius:10px;padding:1rem;border:1px solid rgba(255,255,255,.05)}
+  .tcard .tw{font-size:1.3rem;font-weight:800;font-family:'Space Mono',monospace}
+  .tcard .tn{font-size:.78rem;color:var(--muted);margin-top:2px}
+  .tcard .td{font-size:.78rem;color:var(--muted);margin-top:4px;line-height:1.4}
+
+  .phases-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1.5rem}
+  .phase-card{background:var(--surface);backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:14px;padding:1.8rem;position:relative;overflow:hidden;transition:transform .2s,border-color .2s}
+  .phase-card:hover{transform:translateY(-4px);border-color:rgba(0,245,255,.4)}
+  .phase-num{font-size:3.5rem;font-weight:800;color:rgba(0,245,255,.07);position:absolute;top:1rem;right:1.2rem;font-family:'Space Mono',monospace;line-height:1}
+  .phase-icon{font-size:1.5rem;margin-bottom:.8rem}
+  .phase-card h3{font-size:.95rem;font-weight:700;color:var(--cyan);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em;font-family:'Space Mono',monospace}
+  .phase-card p{font-size:.85rem;color:var(--muted);line-height:1.6}
+  .phase-tag{display:inline-block;margin-top:.8rem;font-size:.7rem;font-family:'Space Mono',monospace;color:var(--green);background:rgba(57,255,138,.08);padding:2px 8px;border-radius:4px}
+
+  .tools-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+  @media(max-width:640px){.tools-grid{grid-template-columns:1fr}}
+  .tool-card{background:var(--surface);backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:14px;padding:2rem;transition:transform .2s}
+  .tool-card:hover{transform:translateY(-3px)}
+  .tool-card h3{font-size:1.05rem;font-weight:700;color:#fff;margin-bottom:.3rem}
+  .tool-sub{font-family:'Space Mono',monospace;font-size:.72rem;color:var(--cyan);margin-bottom:1rem;text-transform:uppercase;letter-spacing:.1em}
+  .tlist{list-style:none;display:flex;flex-direction:column;gap:.5rem}
+  .tlist li{font-size:.85rem;color:var(--muted);display:flex;align-items:flex-start;gap:8px}
+  .tlist li::before{content:'▸';color:var(--cyan);font-size:.8rem;flex-shrink:0;margin-top:2px}
+  .tlist strong{color:var(--text)}
+
+  .code-block{background:#010d1a;border:1px solid rgba(0,245,255,.1);border-radius:12px;padding:1.5rem;font-family:'Space Mono',monospace;font-size:.8rem;line-height:1.7;color:#8ab4d4;overflow-x:auto}
+  .kw{color:var(--magenta)}.fn{color:var(--cyan)}.str{color:var(--green)}.cm{color:var(--muted);font-style:italic}.nm{color:var(--amber)}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem}
+  .kpi-card{background:var(--surface);backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:12px;padding:1.5rem;text-align:center;transition:border-color .2s}
+  .kpi-card:hover{border-color:rgba(0,245,255,.4)}
+  .kpi-val{font-family:'Space Mono',monospace;font-size:1.5rem;font-weight:700;display:block;margin-bottom:.3rem}
+  .kpi-label{font-size:.78rem;color:var(--muted);font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:.1em}
+
+  .future-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem}
+  .future-item{background:var(--surface);backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:10px;padding:1.2rem;display:flex;gap:12px;align-items:flex-start;transition:transform .2s,border-color .2s}
+  .future-item:hover{transform:translateX(4px);border-color:rgba(57,255,138,.3)}
+  .fi{font-size:1.2rem;flex-shrink:0;margin-top:2px}
+  .future-item h4{font-size:.88rem;font-weight:700;color:#fff;margin-bottom:.3rem}
+  .future-item p{font-size:.78rem;color:var(--muted);line-height:1.5}
+
+  .author-section{background:rgba(6,21,38,.7);backdrop-filter:blur(10px);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .author-card{display:flex;align-items:center;gap:2rem;flex-wrap:wrap}
+  .author-av{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--green));display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800;color:var(--bg);flex-shrink:0;border:3px solid rgba(0,245,255,.3)}
+  .author-info h3{font-size:1.3rem;font-weight:800;color:#fff}
+  .author-role{font-family:'Space Mono',monospace;font-size:.78rem;color:var(--cyan);margin:.3rem 0;text-transform:uppercase;letter-spacing:.1em}
+  .author-info p{font-size:.85rem;color:var(--muted);max-width:500px;line-height:1.6}
+
+  footer{text-align:center;padding:3rem 2rem;font-family:'Space Mono',monospace;font-size:.75rem;color:var(--muted);position:relative;z-index:1}
+  footer span{color:var(--cyan)}
+  .divider{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);margin:0 auto;max-width:1100px}
+
+  .reveal{opacity:0;transform:translateY(30px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.visible{opacity:1;transform:translateY(0)}
+  .d1{transition-delay:.1s}.d2{transition-delay:.2s}.d3{transition-delay:.3s}
+
+  @media(max-width:768px){.layer{grid-template-columns:70px 1fr}.lbadge{display:none}.author-card{flex-direction:column;text-align:center}}
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- LIVE 6G NETWORK CANVAS BACKGROUND -->
+<canvas id="net-canvas"></canvas>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="badge"><span class="badge-dot"></span>Active Research · 6G Networks</div>
+  <h1 class="hero-title">
+    <span class="line1">6G Network</span>
+    <span class="line2">Digital Twin + DRL</span>
+    <span class="line3">Architectural Engineering &amp; Implementation Framework</span>
+  </h1>
+  <p class="hero-desc">A 7-layer high-fidelity virtual replica of physical 6G infrastructure, integrating Deep Reinforcement Learning for autonomous, sub-millisecond resource orchestration at Terahertz frequencies.</p>
+  <div class="hero-meta">&#8594; by Nitish Kumar Roy &middot; Research Engineer</div>
+  <div class="hero-stats">
+    <div class="stat-pill"><span class="stat-val">7</span><span class="stat-label">Architecture Layers</span></div>
+    <div class="stat-pill"><span class="stat-val">&lt;1ms</span><span class="stat-label">6G Latency Target</span></div>
+    <div class="stat-pill"><span class="stat-val">PPO</span><span class="stat-label">RL Algorithm</span></div>
+    <div class="stat-pill"><span class="stat-val">THz</span><span class="stat-label">Spectrum</span></div>
+    <div class="stat-pill"><span class="stat-val">4</span><span class="stat-label">Training Phases</span></div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ARCHITECTURE -->
+<section class="arch-bg">
+  <div class="container">
+    <div class="section-tag">Architecture</div>
+    <h2>7-Layer Digital Twin Stack</h2>
+    <p class="section-intro">From raw physical telemetry to intelligent actuation — each layer serves a distinct role in the closed-loop optimization pipeline.</p>
+    <div class="layers-stack reveal">
+      <div class="layer layer-6"><div class="lnum">Layer 6</div><div class="linfo"><h3>Evaluation &amp; Visualization</h3><p>Twin Fidelity via MSE/MAE &middot; SINR CDF curves &middot; RL convergence graphs &middot; Auto-retraining triggers</p></div><div class="lbadge" style="color:#00bcd4;border-color:#00bcd4">Feedback Loop</div></div>
+      <div class="layer layer-5"><div class="lnum">Layer 5</div><div class="linfo"><h3>Control &amp; Actuation</h3><p>Beamforming steering &middot; TX power control &middot; Handover triggers &middot; Network slicing (eMBB / URLLC)</p></div><div class="lbadge" style="color:#e91e63;border-color:#e91e63">Actuation</div></div>
+      <div class="layer layer-4"><div class="lnum">Layer 4</div><div class="linfo"><h3>Joint Training Pipeline</h3><p>4-phase training: Offline Supervised &rarr; RL in Static Twin &rarr; RL in Live Twin &rarr; Deploy</p></div><div class="lbadge" style="color:#ff9800;border-color:#ff9800">Training</div></div>
+      <div class="layer layer-3"><div class="lnum">Layer 3</div><div class="linfo"><h3>Model Registry &amp; Experience Replay</h3><p>LSTM weights &middot; PPO policy storage &middot; Replay buffer (s,a,r,s&#39;) &middot; TensorBoard checkpointing</p></div><div class="lbadge" style="color:#39ff8a;border-color:#39ff8a">Persistence</div></div>
+      <div class="layer layer-2b"><div class="lnum">Layer 2B</div><div class="linfo"><h3>Dynamic Twin &mdash; RL Core</h3><p>PPO Agent &middot; Actor-Critic + GAE &middot; OpenAI Gym MDP &middot; Continuous action space</p></div><div class="lbadge" style="color:#00f5ff;border-color:#00f5ff">Intelligence</div></div>
+      <div class="layer layer-2a"><div class="lnum">Layer 2A</div><div class="linfo"><h3>Static Twin &mdash; Physics Models</h3><p>Friis + ITU-R P.676 &middot; LSTM channel predictor &middot; SINR heatmaps &middot; Isolation Forest</p></div><div class="lbadge" style="color:#7c4dff;border-color:#7c4dff">Physics-Aware</div></div>
+      <div class="layer layer-1"><div class="lnum">Layer 1</div><div class="linfo"><h3>Data Ingestion &amp; Feature Engineering</h3><p>ZeroMQ streams &middot; Normalization &middot; Sliding window buffers &middot; Protobuf serialization</p></div><div class="lbadge" style="color:#ffb300;border-color:#ffb300">Processing</div></div>
+      <div class="layer layer-0"><div class="lnum">Layer 0</div><div class="linfo"><h3>Physical Network &amp; Telemetry</h3><p>6G gNodeB base stations &middot; UE nodes &middot; SINR, throughput, position &middot; ns-3 / OAI</p></div><div class="lbadge" style="color:#ff2d78;border-color:#ff2d78">Physical</div></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- REWARD -->
+<section>
+  <div class="container">
+    <div class="section-tag">Optimization Objective</div>
+    <h2>Multi-Objective Reward Function</h2>
+    <p class="section-intro">The PPO agent is guided by a carefully weighted reward that prioritizes spectral efficiency while penalizing service degradation.</p>
+    <div class="formula-card reveal">
+      <div class="flabel">// Reward Function &mdash; Layer 2B</div>
+      <div class="formula">R = <span class="wt pos">0.4</span>&middot;<span class="vr">norm_SINR</span> + <span class="wt pos">0.3</span>&middot;<span class="vr">norm_TP</span> &minus; <span class="wt neg">0.2</span>&middot;<span class="vr">norm_latency</span> &minus; <span class="wt neg">0.1</span>&middot;<span class="vr">HO_penalty</span></div>
+      <div class="fterms">
+        <div class="tcard"><div class="tw" style="color:#39ff8a">+0.4</div><div class="tn">norm_SINR</div><div class="td">Spectral efficiency &mdash; highest priority in THz bands</div></div>
+        <div class="tcard"><div class="tw" style="color:#39ff8a">+0.3</div><div class="tn">norm_TP</div><div class="td">Throughput &mdash; key QoS indicator for eMBB traffic</div></div>
+        <div class="tcard"><div class="tw" style="color:#ff2d78">&minus;0.2</div><div class="tn">norm_latency</div><div class="td">Latency penalty &mdash; must stay below 1ms 6G target</div></div>
+        <div class="tcard"><div class="tw" style="color:#ff2d78">&minus;0.1</div><div class="tn">HO_penalty</div><div class="td">Handover cost &mdash; degrades QoE in high-mobility scenarios</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- PHASES -->
+<section>
+  <div class="container">
+    <div class="section-tag">Training Pipeline</div>
+    <h2>4-Phase Safe Deployment Strategy</h2>
+    <p class="section-intro">No RL agent is deployed directly to live 6G infrastructure. The phased approach systematically closes the sim-to-real gap.</p>
+    <div class="phases-grid">
+      <div class="phase-card reveal"><div class="phase-num">1</div><div class="phase-icon">&#128218;</div><h3>Offline Supervised</h3><p>Initialize models on historical datasets. Physics models and LSTM predictors learn environmental baselines before any RL exploration.</p><span class="phase-tag">Historical Data</span></div>
+      <div class="phase-card reveal d1"><div class="phase-num">2</div><div class="phase-icon">&#127959;</div><h3>RL in Static Twin</h3><p>PPO agent explores freely in the virtualized Static Twin. Risky actions carry no real-world consequence during 10&sup6; training steps.</p><span class="phase-tag">Risk-Free &middot; 10&sup6; Steps</span></div>
+      <div class="phase-card reveal d2"><div class="phase-num">3</div><div class="phase-icon">&#128225;</div><h3>RL in Live Twin</h3><p>Agent fine-tunes against real-time telemetry from SDR hardware. Actions remain sandboxed &mdash; no physical commands issued.</p><span class="phase-tag">Sandboxed Live Data</span></div>
+      <div class="phase-card reveal d3"><div class="phase-num">4</div><div class="phase-icon">&#128640;</div><h3>Deploy</h3><p>Once Twin Fidelity and safety thresholds are satisfied, the agent assumes full control of the physical 6G network.</p><span class="phase-tag">Live Network Control</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- TOOLCHAINS -->
+<section>
+  <div class="container">
+    <div class="section-tag">Implementation</div>
+    <h2>Toolchain Options</h2>
+    <p class="section-intro">Two complementary pathways &mdash; choose based on whether you prioritize protocol-stack depth or physical-layer accuracy.</p>
+    <div class="tools-grid reveal">
+      <div class="tool-card">
+        <h3>ns-3 + ns3-gym</h3><div class="tool-sub">Standard Academic Pathway</div>
+        <ul class="tlist">
+          <li><strong>Simulator:</strong> ns-3 with 5G-LENA / mmWave modules</li>
+          <li><strong>RL Bridge:</strong> ns3-gym (OpenAI Gym wrapper)</li>
+          <li><strong>IPC:</strong> ZeroMQ + Protocol Buffers (C++/Python)</li>
+          <li><strong>Analytics:</strong> TensorBoard + Matplotlib</li>
+          <li><strong>Best for:</strong> Layer 2B RL training, MAC/PHY protocol interaction</li>
+        </ul>
+      </div>
+      <div class="tool-card">
+        <h3>NVIDIA Aerial + Sionna</h3><div class="tool-sub">High-Fidelity Physics Pathway</div>
+        <ul class="tlist">
+          <li><strong>Ray Tracing:</strong> Sionna RT &mdash; 3D deterministic channel modeling</li>
+          <li><strong>Platform:</strong> NVIDIA Aerial Omniverse Digital Twin (AODT)</li>
+          <li><strong>Acceleration:</strong> CUDA / Tensor Cores for LDPC decoding</li>
+          <li><strong>Capability:</strong> City-scale RF environments in milliseconds</li>
+          <li><strong>Best for:</strong> Layer 2A static twin &mdash; SINR heatmaps, THz physics</li>
+        </ul>
+      </div>
+    </div>
+    <div style="margin-top:2rem" class="reveal">
+      <div class="flabel">// PPO Agent Setup &middot; Stable Baselines3</div>
+      <div class="code-block"><span class="kw">from</span> stable_baselines3 <span class="kw">import</span> <span class="fn">PPO</span>
+<span class="kw">import</span> gym
+
+<span class="cm"># Initialize 6G network environment</span>
+env = gym.<span class="fn">make</span>(<span class="str">"6GNetworkTwin-v0"</span>)
+
+<span class="cm"># PPO with Actor-Critic + GAE</span>
+model = <span class="fn">PPO</span>(<span class="str">"MlpPolicy"</span>, env, verbose=<span class="nm">1</span>,
+    gae_lambda=<span class="nm">0.95</span>, clip_range=<span class="nm">0.2</span>,
+    n_steps=<span class="nm">2048</span>, batch_size=<span class="nm">64</span>)
+
+<span class="cm"># Phase 2: Train in static twin</span>
+model.<span class="fn">learn</span>(total_timesteps=<span class="nm">1_000_000</span>)
+model.<span class="fn">save</span>(<span class="str">"ppo_6g_static_twin"</span>)</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- KPIs -->
+<section>
+  <div class="container">
+    <div class="section-tag">Performance Targets</div>
+    <h2>Key Performance Indicators</h2>
+    <p class="section-intro">6G targets that define success criteria for the digital twin and its deployed RL agent.</p>
+    <div class="kpi-grid reveal">
+      <div class="kpi-card"><span class="kpi-val" style="color:#00f5ff">&lt;1ms</span><span class="kpi-label">E2E Latency</span></div>
+      <div class="kpi-card"><span class="kpi-val" style="color:#39ff8a">0.4</span><span class="kpi-label">SINR Weight</span></div>
+      <div class="kpi-card"><span class="kpi-val" style="color:#39ff8a">0.3</span><span class="kpi-label">Throughput Weight</span></div>
+      <div class="kpi-card"><span class="kpi-val" style="color:#ff2d78">&minus;0.2</span><span class="kpi-label">Latency Penalty</span></div>
+      <div class="kpi-card"><span class="kpi-val" style="color:#ff2d78">&minus;0.1</span><span class="kpi-label">Handover Penalty</span></div>
+      <div class="kpi-card"><span class="kpi-val" style="color:#ffb300">AoDT&rarr;0</span><span class="kpi-label">Twin Freshness</span></div>
+      <div class="kpi-card"><span class="kpi-val" style="color:#00f5ff">MSE&darr;</span><span class="kpi-label">Twin Fidelity</span></div>
+      <div class="kpi-card"><span class="kpi-val" style="color:#39ff8a">10&sup6;</span><span class="kpi-label">Training Steps</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FUTURE -->
+<section>
+  <div class="container">
+    <div class="section-tag">Roadmap</div>
+    <h2>Future Research Directions</h2>
+    <p class="section-intro">Planned extensions to push the framework toward production-grade 6G network intelligence.</p>
+    <div class="future-grid">
+      <div class="future-item reveal"><div class="fi">&#127760;</div><div><h4>Federated Digital Twins</h4><p>Distributed twin synchronization across multi-operator 6G deployments without sharing raw telemetry.</p></div></div>
+      <div class="future-item reveal d1"><div class="fi">&#127919;</div><div><h4>Goal-Oriented Semantic Twinning</h4><p>Lightweight task-specific modeling for SAGSIN networks &mdash; prioritize utility over full-scale fidelity.</p></div></div>
+      <div class="future-item reveal d2"><div class="fi">&#129309;</div><div><h4>Multi-Agent RL (MARL)</h4><p>Coordinated beamforming across multiple base stations with cooperative multi-agent policies.</p></div></div>
+      <div class="future-item reveal"><div class="fi">&#9879;</div><div><h4>THz Channel Modeling</h4><p>Extending beyond ITU-R P.676 to model molecular absorption and scattering at sub-THz frequencies.</p></div></div>
+      <div class="future-item reveal d1"><div class="fi">&#128260;</div><div><h4>Sim-to-Real Transfer</h4><p>Domain randomization and adaptive fine-tuning to eliminate the sim-to-real performance gap.</p></div></div>
+      <div class="future-item reveal d2"><div class="fi">&#128737;</div><div><h4>Adversarial Security Layer</h4><p>Detection and mitigation of Sandwich attacks via the Isolation Forest anomaly subsystem.</p></div></div>
+      <div class="future-item reveal"><div class="fi">&#128752;</div><div><h4>6G NTN Support</h4><p>Non-Terrestrial Network (satellite, HAPS, UAV) node integration within the ns-3 simulation layer.</p></div></div>
+      <div class="future-item reveal d1"><div class="fi">&#127961;</div><div><h4>NVIDIA Sionna RT Integration</h4><p>City-scale deterministic ray tracing pipeline feeding directly into the RL training loop in real-time.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- AUTHOR -->
+<section class="author-section">
+  <div class="container">
+    <div class="author-card">
+      <div class="author-av">N</div>
+      <div class="author-info">
+        <h3>Nitish Kumar Roy</h3>
+        <div class="author-role">Research Engineer &middot; 6G Networks &amp; Intelligent Systems</div>
+        <p>Specializing in Network Digital Twins, Deep Reinforcement Learning for telecommunications, and THz channel modeling. This framework bridges the gap between theoretical 6G aspirations and operational network intelligence.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>6G Network Digital Twin + DRL Framework &nbsp;&middot;&nbsp; <span>Nitish Kumar Roy</span> &nbsp;&middot;&nbsp; Research Engineer</p>
+  <p style="margin-top:.5rem;opacity:.5">Architecture based on ITU-R P.676 &middot; Friis Transmission &middot; PPO Actor-Critic &middot; ns-3 + ns3-gym &middot; NVIDIA Sionna</p>
+</footer>
+
+<script>
+// ── Cursor ──
+const cur=document.getElementById('cursor'),ring=document.getElementById('cursorRing');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.cssText=`left:${mx-6}px;top:${my-6}px`});
+(function ar(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ring.style.cssText=`left:${rx-18}px;top:${ry-18}px`;requestAnimationFrame(ar)})();
+
+// ── Scroll reveal ──
+const io=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');io.unobserve(e.target)}}),{threshold:.12});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+// ══════════════════════════════════════════════
+//   6G NETWORK TOPOLOGY CANVAS BACKGROUND
+// ══════════════════════════════════════════════
+const C=document.getElementById('net-canvas');
+const X=C.getContext('2d');
+let W=0,H=0,frame=0;
+const nodes=[],packets=[],rings=[];
+
+function resize(){W=C.width=innerWidth;H=C.height=innerHeight}
+resize();
+window.addEventListener('resize',()=>{resize();buildNetwork()});
+
+// ── Node colours by role ──
+const COL={gnb:'#00f5ff',ue:'#39ff8a',sat:'#ffb300',uav:'#ff2d78',mec:'#7c4dff'};
+
+function buildNetwork(){
+  nodes.length=0;packets.length=0;rings.length=0;
+
+  // gNodeB towers (fixed, percentage positions)
+  [[.10,.18],[.35,.10],[.62,.15],[.88,.22],[.20,.58],[.78,.62],[.50,.82]].forEach(([px,py])=>{
+    nodes.push({role:'gnb',x:px*W,y:py*H,r:9,vx:0,vy:0,fixed:true,
+      pulse:Math.random()*Math.PI*2,ps:.025,sinr:(Math.random()*20+12).toFixed(1)+'dB'});
+  });
+
+  // Satellite (orbiting)
+  nodes.push({role:'sat',x:W*.5,y:H*.03,r:7,fixed:false,
+    ot:Math.random()*Math.PI*2,oamp:W*.38,ocy:H*.045,ospeed:.0003});
+
+  // UAV relays (hovering)
+  [[.42,.28],[.25,.44],[.68,.38]].forEach(([px,py],i)=>{
+    nodes.push({role:'uav',x:px*W,y:py*H,r:5,fixed:false,
+      hx:px*W,hy:py*H,ht:i*2.1,hspeed:.008+i*.003});
+  });
+
+  // MEC edge servers (fixed)
+  [[.50,.50],[.28,.72],[.72,.70]].forEach(([px,py])=>{
+    nodes.push({role:'mec',x:px*W,y:py*H,r:8,fixed:true,
+      load:Math.floor(Math.random()*50+30)+'%'});
+  });
+
+  // Mobile UEs
+  for(let i=0;i<22;i++){
+    nodes.push({role:'ue',x:Math.random()*W,y:H*.2+Math.random()*H*.78,r:3.5,
+      vx:(Math.random()-.5)*.5,vy:(Math.random()-.5)*.4,fixed:false,
+      wt:Math.random()*Math.PI*2});
+  }
+
+  // Scan rings for each gNB
+  nodes.filter(n=>n.role==='gnb').forEach(n=>{
+    rings.push({n,r:0,maxR:100+Math.random()*80,speed:.9+Math.random()*.6});
+  });
+}
+
+// ── Link logic ──
+function getLinks(){
+  const L=[];
+  nodes.forEach((a,i)=>nodes.slice(i+1).forEach(b=>{
+    const d=Math.hypot(a.x-b.x,a.y-b.y);
+    if(a.role==='gnb'&&b.role==='gnb'&&d<W*.45)L.push({a,b,type:'backbone'});
+    if((a.role==='gnb'&&b.role==='mec'||a.role==='mec'&&b.role==='gnb')&&d<W*.5)L.push({a,b,type:'core'});
+    if((a.role==='sat'&&b.role==='gnb'||a.role==='gnb'&&b.role==='sat'))L.push({a,b,type:'ntn'});
+    if((a.role==='uav'&&b.role==='gnb'||a.role==='gnb'&&b.role==='uav')&&d<W*.4)L.push({a,b,type:'uav'});
+    if((a.role==='gnb'&&b.role==='ue'||a.role==='ue'&&b.role==='gnb')&&d<W*.25)L.push({a,b,type:'air'});
+  }));
+  return L;
+}
+
+// ── Spawn data packets ──
+function spawnPkts(links){
+  links.forEach(l=>{
+    if(Math.random()<.25){
+      packets.push({a:l.a,b:l.b,t:0,
+        sp:.005+Math.random()*.006,
+        col:l.type==='ntn'?COL.sat:l.type==='uav'?COL.uav:l.type==='core'?COL.mec:COL.gnb,
+        sz:l.type==='backbone'||l.type==='core'?3:2});
+    }
+  });
+}
+
+// ── Draw shapes ──
+function hexPath(cx,cy,r){
+  X.beginPath();
+  for(let i=0;i<6;i++){const a=i*Math.PI/3-Math.PI/6;i?X.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r):X.moveTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r)}
+  X.closePath();
+}
+
+function drawGNB(n){
+  // Glow
+  X.beginPath();X.arc(n.x,n.y,n.r*2.5+Math.sin(n.pulse)*3,0,Math.PI*2);
+  X.fillStyle='rgba(0,245,255,.05)';X.fill();
+  // Hex
+  hexPath(n.x,n.y,n.r);
+  X.fillStyle='rgba(0,245,255,.12)';X.fill();
+  X.strokeStyle=COL.gnb;X.lineWidth=1.5;X.stroke();
+  // Mast
+  X.beginPath();X.moveTo(n.x,n.y-n.r);X.lineTo(n.x,n.y-n.r-9);
+  X.moveTo(n.x-5,n.y-n.r-9);X.lineTo(n.x+5,n.y-n.r-9);
+  X.strokeStyle=COL.gnb;X.lineWidth=1.5;X.stroke();
+  // SINR label
+  X.fillStyle='rgba(0,245,255,.7)';X.font='9px Space Mono,monospace';
+  X.textAlign='center';X.fillText(n.sinr,n.x,n.y+n.r+13);
+}
+
+function drawSat(n){
+  X.save();X.translate(n.x,n.y);
+  // Orbital ellipse trace
+  X.beginPath();X.ellipse(0,0,n.oamp||W*.38,28,0,0,Math.PI*2);
+  X.strokeStyle='rgba(255,179,0,.05)';X.lineWidth=.5;X.stroke();
+  // Body
+  X.fillStyle='rgba(255,179,0,.15)';X.strokeStyle=COL.sat;X.lineWidth=1.2;
+  X.beginPath();X.rect(-7,-4,14,8);X.fill();X.stroke();
+  // Solar wings
+  [-1,1].forEach(s=>{X.beginPath();X.rect(s<0?-19:-7,-3,10,6);X.fill();X.stroke()});
+  // Dish
+  X.beginPath();X.moveTo(0,-4);X.lineTo(0,-10);X.stroke();
+  X.beginPath();X.arc(0,-10,2.5,0,Math.PI*2);X.fill();X.stroke();
+  X.restore();
+  X.fillStyle='rgba(255,179,0,.7)';X.font='9px Space Mono,monospace';
+  X.textAlign='center';X.fillText('SAT·LEO',n.x,n.y+18);
+}
+
+function drawUAV(n){
+  X.save();X.translate(n.x,n.y);
+  X.strokeStyle=COL.uav;X.lineWidth=1.2;
+  [-1,1].forEach(sx=>[-1,1].forEach(sy=>{
+    X.beginPath();X.moveTo(0,0);X.lineTo(sx*9,sy*9);X.stroke();
+    X.beginPath();X.arc(sx*9,sy*9,2.5,0,Math.PI*2);
+    X.fillStyle=COL.uav+'44';X.fill();X.stroke();
+  }));
+  X.beginPath();X.arc(0,0,3.5,0,Math.PI*2);
+  X.fillStyle=COL.uav+'66';X.fill();X.strokeStyle=COL.uav;X.stroke();
+  X.restore();
+  X.fillStyle=COL.uav+'bb';X.font='9px Space Mono,monospace';
+  X.textAlign='center';X.fillText('UAV',n.x,n.y+19);
+}
+
+function drawMEC(n){
+  X.fillStyle=COL.mec+'1a';X.strokeStyle=COL.mec;X.lineWidth=1.2;
+  X.beginPath();
+  const rx2=n.x-10,ry2=n.y-7;
+  X.roundRect(rx2,ry2,20,14,3);X.fill();X.stroke();
+  // LED lines
+  X.strokeStyle=COL.mec+'66';X.lineWidth=1;
+  X.beginPath();X.moveTo(n.x-7,n.y-2);X.lineTo(n.x+7,n.y-2);X.stroke();
+  X.beginPath();X.moveTo(n.x-7,n.y+2);X.lineTo(n.x+7,n.y+2);X.stroke();
+  X.fillStyle=COL.mec+'cc';X.font='9px Space Mono,monospace';
+  X.textAlign='center';X.fillText('MEC',n.x,n.y+17);
+  X.fillText(n.load,n.x,n.y+27);
+}
+
+function drawUE(n){
+  X.beginPath();X.arc(n.x,n.y,n.r,0,Math.PI*2);
+  X.fillStyle=COL.ue+'2a';X.fill();
+  X.strokeStyle=COL.ue;X.lineWidth=1;X.stroke();
+  // Mini signal bars
+  X.fillStyle=COL.ue+'cc';
+  [-2.5,0,2.5].forEach((bx,i)=>{const bh=(i+1)*2.5;X.fillRect(n.x+bx-.8,n.y-n.r-1-bh,1.6,bh)});
+}
+
+// ── Beam cone from gNB to UE ──
+function drawBeamCones(gnbs,ues){
+  gnbs.forEach(g=>{
+    const nearby=ues.filter(u=>Math.hypot(u.x-g.x,u.y-g.y)<W*.27)
+      .sort((a,b)=>Math.hypot(a.x-g.x,a.y-g.y)-Math.hypot(b.x-g.x,b.y-g.y)).slice(0,3);
+    nearby.forEach(u=>{
+      const dx=u.x-g.x,dy=u.y-g.y,len=Math.hypot(dx,dy),ang=Math.atan2(dy,dx);
+      X.save();X.translate(g.x,g.y);
+      X.beginPath();X.moveTo(0,0);X.arc(0,0,len,ang-.16,ang+.16);X.closePath();
+      X.fillStyle='rgba(0,245,255,.04)';X.fill();
+      X.restore();
+    });
+  });
+}
+
+// ── Main animation ──
+function tick(){
+  X.clearRect(0,0,W,H);
+  frame++;
+
+  const links=getLinks();
+  const gnbs=nodes.filter(n=>n.role==='gnb');
+  const ues=nodes.filter(n=>n.role==='ue');
+
+  // 1. Beam cones
+  drawBeamCones(gnbs,ues);
+
+  // 2. Scan rings
+  rings.forEach(sr=>{
+    sr.r+=sr.speed;
+    if(sr.r>sr.maxR){sr.r=0}
+    const a=.4*(1-sr.r/sr.maxR);
+    X.beginPath();X.arc(sr.n.x,sr.n.y,sr.r,0,Math.PI*2);
+    X.strokeStyle=`rgba(0,245,255,${a*.35})`;X.lineWidth=1;X.stroke();
+  });
+
+  // 3. Links
+  links.forEach(({a,b,type})=>{
+    X.beginPath();X.moveTo(a.x,a.y);X.lineTo(b.x,b.y);
+    const styles={backbone:'rgba(0,245,255,.22)',core:'rgba(124,77,255,.2)',
+      ntn:'rgba(255,179,0,.18)',uav:'rgba(255,45,120,.15)',air:'rgba(0,245,255,.09)'};
+    X.strokeStyle=styles[type]||'rgba(0,245,255,.1)';
+    X.lineWidth=type==='backbone'||type==='core'?1.2:.7;
+    if(type==='ntn'){X.setLineDash([6,5])}else{X.setLineDash([])}
+    X.stroke();X.setLineDash([]);
+  });
+
+  // 4. Data packets
+  for(let i=packets.length-1;i>=0;i--){
+    const p=packets[i];p.t+=p.sp;
+    if(p.t>1){packets.splice(i,1);continue}
+    const px=p.a.x+(p.b.x-p.a.x)*p.t, py=p.a.y+(p.b.y-p.a.y)*p.t;
+    const tx=p.a.x+(p.b.x-p.a.x)*Math.max(0,p.t-.08), ty=p.a.y+(p.b.y-p.a.y)*Math.max(0,p.t-.08);
+    X.beginPath();X.moveTo(tx,ty);X.lineTo(px,py);
+    X.strokeStyle=p.col+'88';X.lineWidth=1.5;X.stroke();
+    X.beginPath();X.arc(px,py,p.sz,0,Math.PI*2);
+    X.fillStyle=p.col;X.fill();
+  }
+  if(frame%80===0)spawnPkts(links);
+
+  // 5. Update & draw nodes
+  nodes.forEach(n=>{
+    if(n.role==='uav'){n.ht+=n.hspeed;n.x=n.hx+Math.sin(n.ht)*28;n.y=n.hy+Math.cos(n.ht*.7)*14}
+    if(n.role==='sat'){n.ot+=n.ospeed*1000;n.x=W*.5+Math.sin(n.ot)*(n.oamp||W*.38);n.y=(n.ocy||H*.045)+Math.abs(Math.sin(n.ot))*18}
+    if(n.role==='ue'&&!n.fixed){
+      n.wt+=.007;n.x+=n.vx+Math.sin(n.wt+n.r)*.12;n.y+=n.vy+Math.cos(n.wt*.7)*.08;
+      if(n.x<5)n.vx=Math.abs(n.vx);if(n.x>W-5)n.vx=-Math.abs(n.vx);
+      if(n.y<H*.18)n.vy=Math.abs(n.vy);if(n.y>H-5)n.vy=-Math.abs(n.vy);
+    }
+    if(n.role==='gnb')n.pulse+=n.ps;
+
+    // Draw by role
+    if(n.role==='gnb')drawGNB(n);
+    else if(n.role==='sat')drawSat(n);
+    else if(n.role==='uav')drawUAV(n);
+    else if(n.role==='mec')drawMEC(n);
+    else drawUE(n);
+  });
+
+  // 6. HUD overlay (top-left)
+  X.textAlign='left';X.font='9px Space Mono,monospace';
+  [['6G NETWORK TOPOLOGY','rgba(0,245,255,.45)'],[`NODES:${nodes.length} · LINKS:${links.length}`,'rgba(0,245,255,.28)'],[`PACKETS:${packets.length}`,'rgba(57,255,138,.28)']].forEach(([t,c],i)=>{X.fillStyle=c;X.fillText(t,14,14+i*13)});
+
+  // Legend (bottom-left)
+  Object.entries(COL).forEach(([role,col],i)=>{
+    const ly=H-14-i*15;
+    X.beginPath();X.arc(18,ly-4,4,0,Math.PI*2);X.fillStyle=col+'88';X.fill();
+    X.fillStyle=col+'80';X.font='9px Space Mono,monospace';X.textAlign='left';
+    X.fillText(role.toUpperCase(),26,ly);
+  });
+
+  // Scanline
+  X.fillStyle='rgba(2,11,24,.15)';
+  for(let sy=0;sy<H;sy+=4)X.fillRect(0,sy,W,1);
+
+  requestAnimationFrame(tick);
+}
+
+buildNetwork();
+tick();
+</script>
+</body>
+</html>
